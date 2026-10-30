@@ -76,6 +76,9 @@ def capacity_failure(log_text):
     """Retry only a recognizable capacity error with no other Terraform errors."""
     import re
     text = re.sub(r"\x1b\[[0-9;]*m", "", str(log_text))
+    # Resource Manager prefixes every Terraform line with its timestamp and level.
+    text = re.sub(r"(?m)^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}"
+                  r"\[TERRAFORM_CONSOLE\] \[[A-Z]+\] ?", "", text)
     errors = re.findall(r"(?:^|\n)[^\S\n]*[│|]?\s*Error:\s*([^\n]+)", text)
     markers = ("out of host capacity", "out of capacity", "outofhostcapacity",
                "out_of_host_capacity")
