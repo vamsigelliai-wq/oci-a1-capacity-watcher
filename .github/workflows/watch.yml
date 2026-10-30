@@ -1,0 +1,65 @@
+name: OCI A1 capacity watcher
+
+on:
+  schedule:
+    - cron: '7,17,27,37,47,57 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Check only, or check and apply the reviewed stack
+        type: choice
+        default: check
+        options:
+          - check
+          - apply
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: oci-a1-capacity-watcher
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    if: github.event_name == 'workflow_dispatch' || vars.OCI_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Install OCI SDK
+        run: python -m pip install --disable-pip-version-check --quiet -r requirements.txt
+      - name: Check capacity and stack
+        id: watcher
+        env:
+          OCI_TENANCY_ID: ${{ secrets.OCI_TENANCY_ID }}
+          OCI_USER_ID: ${{ secrets.OCI_USER_ID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_API_KEY: ${{ secrets.OCI_API_KEY }}
+          OCI_KEY_PASSPHRASE: ${{ secrets.OCI_KEY_PASSPHRASE }}
+          OCI_STACK_ID: ${{ secrets.OCI_STACK_ID }}
+          OCI_AVAILABILITY_DOMAIN: ${{ secrets.OCI_AVAILABILITY_DOMAIN }}
+          OCI_MAIN_TF_SHA256: ${{ secrets.OCI_MAIN_TF_SHA256 }}
+          OCI_INSTANCE_NAME: ${{ secrets.OCI_INSTANCE_NAME }}
+          OCI_REGION: ap-hyderabad-1
+          EVENT_NAME: ${{ github.event_name }}
+          REQUEST_MODE: ${{ inputs.mode }}
+        shell: bash
+        run: |
+          if [[ "$EVENT_NAME" == "schedule" || "$REQUEST_MODE" == "apply" ]]; then
+            python watcher.py --apply
+          else
+            python watcher.py
+          fi
+      - name: Disable further scheduled runs after success
+        if: steps.watcher.outputs.complete == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow disable watch.yml --repo "$GH_REPO"
