@@ -2,7 +2,7 @@
 
 Check for one **VM.Standard.A1.Flex instance with 2 OCPUs and 12 GB RAM** in Hyderabad, then apply an existing, reviewed OCI Resource Manager stack. Terraform state stays in OCI.
 
-**Status: credentials required; scheduled cloud changes are gated off until OCI_ENABLED is set to true.**
+Scheduling is controlled by the repository Variable OCI_ENABLED and the fixed OCI_STOP_AT deadline. Credentials and account settings belong only in encrypted repository Secrets.
 
 ## Behavior
 
@@ -40,7 +40,7 @@ Use a dedicated OCI automation identity with the necessary read, capacity-report
 1. Add the Secrets above after configuring the OCI API signing identity. Set repository Variable OCI_STOP_AT to a fixed UTC timestamp no more than seven days ahead before the check-only run.
 2. Open Actions → OCI A1 capacity watcher → Run workflow and choose **check**. This mode never submits an apply. Resolve any errors privately in OCI.
 3. Only after a successful live check, create the non-sensitive repository **Variable** OCI_ENABLED with value true. Scheduled runs can then submit an apply without another prompt.
-4. Set repository Variable OCI_STOP_AT to a fixed UTC timestamp no more than seven days ahead. The schedule requests a run at minute 17 of each hour. It stops at the deadline.
+4. The schedule requests a run at minute 17 of each hour. At the fixed deadline, the guard makes no OCI requests and disables the workflow on its next run.
 
 Any throttling, authentication, permission, or unexpected error disables the workflow for review. Each OCI API call gets one attempt. Set OCI_ENABLED to false or disable the workflow to pause. Already-submitted OCI jobs continue independently. Do not manually apply or edit the stack while the watcher is enabled. Remove its OCI API key and GitHub secret after the automation is no longer needed.
 
