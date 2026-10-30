@@ -7,7 +7,7 @@ Check for one **VM.Standard.A1.Flex instance with 2 OCPUs and 12 GB RAM** in Hyd
 ## Behavior
 
 - Requests matching capacity in FAULT-DOMAIN-1, FAULT-DOMAIN-2, and FAULT-DOMAIN-3.
-- Checks every ten minutes when enabled. GitHub schedules can be delayed or skipped.
+- Checks hourly when enabled. GitHub schedules can be delayed or skipped.
 - Submits one apply only when OCI reports capacity; an existing active job prevents another apply.
 - Checks existing A1 usage and regional boot/block storage before adding the reviewed 100 GB boot disk.
 - Rejects changes to the reviewed single-file Terraform configuration using its SHA256.
@@ -37,12 +37,12 @@ Use a dedicated OCI automation identity with the necessary read, capacity-report
 
 ## Enable
 
-1. Add the Secrets above after configuring the OCI API signing identity.
+1. Add the Secrets above after configuring the OCI API signing identity. Set repository Variable OCI_STOP_AT to a fixed UTC timestamp no more than seven days ahead before the check-only run.
 2. Open Actions → OCI A1 capacity watcher → Run workflow and choose **check**. This mode never submits an apply. Resolve any errors privately in OCI.
 3. Only after a successful live check, create the non-sensitive repository **Variable** OCI_ENABLED with value true. Scheduled runs can then submit an apply without another prompt.
-4. The schedule requests runs at UTC minutes 07, 17, 27, 37, 47, and 57.
+4. Set repository Variable OCI_STOP_AT to a fixed UTC timestamp no more than seven days ahead. The schedule requests a run at minute 17 of each hour. It stops at the deadline.
 
-Set OCI_ENABLED to false or disable the workflow to pause. Already-submitted OCI jobs continue independently. Do not manually apply or edit the stack while the watcher is enabled. Remove its OCI API key and GitHub secret after the automation is no longer needed.
+Any throttling, authentication, permission, or unexpected error disables the workflow for review. Each OCI API call gets one attempt. Set OCI_ENABLED to false or disable the workflow to pause. Already-submitted OCI jobs continue independently. Do not manually apply or edit the stack while the watcher is enabled. Remove its OCI API key and GitHub secret after the automation is no longer needed.
 
 ## Limits
 
