@@ -2,7 +2,7 @@ name: OCI A1 capacity watcher
 
 on:
   schedule:
-    - cron: '7,17,27,37,47,57 * * * *'
+    - cron: '17 * * * *'
   workflow_dispatch:
     inputs:
       mode:
@@ -33,10 +33,17 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
+      - name: Enforce seven-day deadline before OCI requests
+        id: window
+        env:
+          OCI_STOP_AT: ${{ vars.OCI_STOP_AT }}
+        run: python control.py
       - name: Install OCI SDK
+        if: steps.window.outputs.expired != 'true'
         run: python -m pip install --disable-pip-version-check --quiet -r requirements.txt
       - name: Check capacity and stack
         id: watcher
+        if: steps.window.outputs.expired != 'true'
         env:
           OCI_TENANCY_ID: ${{ secrets.OCI_TENANCY_ID }}
           OCI_USER_ID: ${{ secrets.OCI_USER_ID }}
@@ -50,6 +57,7 @@ jobs:
           OCI_REGION: ap-hyderabad-1
           EVENT_NAME: ${{ github.event_name }}
           REQUEST_MODE: ${{ inputs.mode }}
+          OCI_STOP_AT: ${{ vars.OCI_STOP_AT }}
         shell: bash
         run: |
           if [[ "$EVENT_NAME" == "schedule" || "$REQUEST_MODE" == "apply" ]]; then
@@ -57,8 +65,8 @@ jobs:
           else
             python watcher.py
           fi
-      - name: Disable further scheduled runs after success
-        if: steps.watcher.outputs.complete == 'true'
+      - name: Pause after success, expiry, or any unexpected error
+        if: always() && (failure() || steps.window.outputs.expired == 'true' || steps.watcher.outputs.complete == 'true')
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
