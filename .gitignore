@@ -1,0 +1,14 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+*.pem
+*.key
+*.pub
+*.zip
+*.tfstate*
+*.tfvars*
+config
+private-setup*
