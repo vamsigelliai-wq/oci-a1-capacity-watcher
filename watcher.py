@@ -7,6 +7,7 @@ import uuid
 import zipfile
 
 import oci
+from control import expired
 
 SHAPE = "VM.Standard.A1.Flex"
 FAULT_DOMAINS = {f"FAULT-DOMAIN-{i}" for i in (1, 2, 3)}
@@ -122,6 +123,9 @@ def inventory(identity, compute, block, tenancy, ads):
 
 def run():
     apply = "--apply" in sys.argv[1:]
+    if apply:
+        require(not expired(required("OCI_STOP_AT")),
+                "Provisioning window ended. No apply allowed.")
     tenancy, stack_id = required("OCI_TENANCY_ID"), required("OCI_STACK_ID")
     region, ad = required("OCI_REGION"), required("OCI_AVAILABILITY_DOMAIN")
     require(region == "ap-hyderabad-1", "This reviewed setup targets Hyderabad only.")
@@ -131,7 +135,8 @@ def run():
     if os.environ.get("OCI_KEY_PASSPHRASE"):
         config["pass_phrase"] = os.environ["OCI_KEY_PASSPHRASE"]
     oci.config.validate_config(config)
-    opts = {"retry_strategy": oci.retry.DEFAULT_RETRY_STRATEGY, "timeout": (10, 30)}
+    # One attempt per API call. Throttling or other errors pause the workflow for review.
+    opts = {"retry_strategy": oci.retry.NoneRetryStrategy(), "timeout": (10, 30)}
     identity = oci.identity.IdentityClient(config, **opts)
     compute = oci.core.ComputeClient(config, **opts)
     block = oci.core.BlockstorageClient(config, **opts)
@@ -183,6 +188,8 @@ def run():
     require(stack_response.headers.get("etag") is not None and
             current_stack.headers.get("etag") == stack_response.headers.get("etag"),
             "Stack changed during the check. No apply submitted.")
+    require(not expired(required("OCI_STOP_AT")),
+            "Provisioning window ended during checks. No apply submitted.")
     job = rm.create_job(oci.resource_manager.models.CreateJobDetails(
         stack_id=stack_id, display_name="a1-capacity-watcher",
         operation="APPLY", job_operation_details=
