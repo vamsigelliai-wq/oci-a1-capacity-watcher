@@ -2,7 +2,7 @@ name: OCI A1 capacity watcher
 
 on:
   schedule:
-    - cron: '17 * * * *'
+    - cron: '17,47 * * * *'
   workflow_dispatch:
     inputs:
       mode:
